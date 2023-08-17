@@ -1,0 +1,18 @@
+{
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "age": {
+        "type": "integer"
+      },
+      "created": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+}
