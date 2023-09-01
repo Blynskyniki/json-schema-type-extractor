@@ -1,76 +1,50 @@
-import { UnwrapArray } from './common';
-import * as JSONDATA from './__fixtures__/object-schema.json';
-
-const schema1 = {
-  properties: {
-    name: {
-      type: 'string',
-    },
-    age: {
-      type: 'integer',
-    },
-    created: {
-      type: 'string',
-      format: 'date-time',
-    },
-  },
-  required: ['name'],
-  type: 'object',
-} as const;
-
-const schema2 = {
-  type: 'array',
-  items: {
-    type: 'string',
-  },
-} as const;
-
-const schema3 = {
-  type: 'array',
-  items: {
-    properties: {
-      name: {
-        type: 'string',
-      },
-      age: {
-        type: 'integer',
-      },
-      created: {
-        type: 'string',
-        format: 'date-time',
-      },
-    },
-    required: ['name'],
-    type: 'object',
-  },
-} as const;
+import { RequiredFields, UnwrapArray, Writeable } from './common';
+import * as schemas from './__fixtures__/';
 
 type PropsLike = {
   type: 'string' | 'integer' | 'double';
   format?: 'uuid' | 'date' | 'date-time';
   [key: string]: any;
 };
+
 type PropsDict = {
   [key: string]: PropsLike;
 };
-type Writeable<T> = { -readonly [P in keyof T]: Writeable<T[P]> };
-type SchemaLike<T extends SchemaLike<T> | unknown> = {
-  properties: PropsDict;
+
+type SchemaLike<T extends SchemaLike<T>> = ObjectSchemaLike<T> | ArraySchemaLike<T>;
+
+type BaseSchemaLike = {
   type: 'object' | 'array';
-  [key: string]: any;
   required?: string[];
-};
-type extract<T extends SchemaLike<T>> = T['type'] extends 'object' ? extractMap<T> : unknown;
-
-type onlyRequired<T extends SchemaLike<T>> = {
-  [P in UnwrapArray<T['required']>]: T['properties'][P];
+  [key: string]: any;
 };
 
-type extractMap<T extends SchemaLike<T>, Q = onlyRequired<T>> = {
-  [K in keyof Q]: extractType<Q[K]>;
-} & {
-  [K in keyof T['properties']]?: extractType<T['properties'][K]>;
-};
+interface ObjectSchemaLike<T extends SchemaLike<T>> extends BaseSchemaLike {
+  type: 'object';
+  properties: PropsDict;
+}
+
+interface ArraySchemaLike<T extends SchemaLike<T>> extends BaseSchemaLike {
+  type: 'array';
+  items: ObjectSchemaLike<T> | { type: 'string' };
+}
+
+type extract<T extends SchemaLike<T>> = T extends ObjectSchemaLike<T>
+  ? extractObject<T>
+  : T extends ArraySchemaLike<T>
+  ? extractArray<T>
+  : unknown;
+
+type extractObject<T extends ObjectSchemaLike<T>> = RequiredFields<
+  { [K in keyof T['properties']]?: extractType<T['properties'][K]> },
+  UnwrapArray<T['required']>
+>;
+
+type extractArray<T extends ArraySchemaLike<T>> = T['items'] extends ObjectSchemaLike<T>
+  ? Array<extractObject<T['items']>>
+  : T['items'] extends { type: 'string' }
+  ? Array<string>
+  : unknown;
 
 type extractType<T extends PropsLike | unknown> = T extends PropsLike
   ? T['type'] extends 'string'
@@ -88,7 +62,10 @@ type extractType<T extends PropsLike | unknown> = T extends PropsLike
     : unknown
   : unknown;
 
-type exampleSchema1 = extract<Writeable<typeof schema1>>;
+type Schema1 = extract<Writeable<typeof schemas.schema1>>;
+type Schema2 = extract<Writeable<typeof schemas.schema2>>;
+type Schema3 = extract<Writeable<typeof schemas.schema3>>;
 
-type exampleSchema2 = UnwrapArray<Writeable<(typeof schema1)['required']>>;
-type exampleSchemaJSON = UnwrapArray<Writeable<(typeof JSONDATA)['required']>>; // must be "name"
+const example1: Schema1 = { name: '', created: new Date() };
+const example2: Schema2 = [];
+const example3: Schema3 = [{ userId: 1, id: 1, title: '' }];
